@@ -1,18 +1,70 @@
+'use strict';
+
 const vscode = require('vscode');
-const { exec } = require('child_process');
+const {
+  readRegisteredVaults,
+  findContainingVault,
+  buildOpenUri,
+} = require('./vaults');
+
+async function openTargetInObsidian(targetUri, openFile) {
+  if (!targetUri || targetUri.scheme !== 'file') {
+    vscode.window.showErrorMessage(
+      openFile
+        ? 'Select a local Markdown file to open in Obsidian.'
+        : 'Right-click a local folder in the Explorer to open its Obsidian vault.'
+    );
+    return;
+  }
+
+  let vaults;
+  try {
+    vaults = await readRegisteredVaults();
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      vscode.window.showErrorMessage(
+        'Obsidian vault registry not found. Open the folder as a vault in Obsidian first.'
+      );
+    } else {
+      vscode.window.showErrorMessage(
+        'Could not read Obsidian vaults: ' + (error.message || String(error))
+      );
+    }
+    return;
+  }
+
+  const match = findContainingVault(vaults, targetUri.fsPath);
+  if (!match) {
+    vscode.window.showWarningMessage(
+      'This path is not inside a registered Obsidian vault. Open it as a vault in Obsidian first.'
+    );
+    return;
+  }
+
+  const obsidianUri = buildOpenUri(match.id, openFile ? match.relativePath : undefined);
+  try {
+    const opened = await vscode.env.openExternal(vscode.Uri.parse(obsidianUri));
+    if (!opened) {
+      vscode.window.showErrorMessage(
+        'Could not launch Obsidian. Ensure it is installed and the obsidian:// protocol is registered.'
+      );
+    }
+  } catch (error) {
+    vscode.window.showErrorMessage(
+      'Could not launch Obsidian: ' + (error.message || String(error))
+    );
+  }
+}
 
 function activate(context) {
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 9999);
-  // Status bar items only support codicons, not custom images. There's no
-  // gem/crystal codicon (that was a mistake) — sparkle-filled is the
-  // closest faceted shape to Obsidian's logo.
   statusBarItem.text = '$(sparkle-filled)';
   statusBarItem.color = '#7C3AED';
   statusBarItem.tooltip = 'Open in Obsidian';
   statusBarItem.command = 'openInObsidian.open';
 
   const updateStatusBarVisibility = (editor) => {
-    if (editor?.document.languageId === 'markdown') {
+    if (editor?.document.languageId === 'markdown' && editor.document.uri.scheme === 'file') {
       statusBarItem.show();
     } else {
       statusBarItem.hide();
@@ -22,47 +74,16 @@ function activate(context) {
   updateStatusBarVisibility(vscode.window.activeTextEditor);
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateStatusBarVisibility));
 
-  const disposable = vscode.commands.registerCommand('openInObsidian.open', (uri) => {
-    const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
-
-    if (!targetUri) {
-      vscode.window.showErrorMessage('No file to open in Obsidian.');
-      return;
-    }
-
-    // Obsidian's `path` parameter takes an absolute filesystem path and
-    // figures out which vault it belongs to on its own, so you don't
-    // need to hardcode a vault name.
-    let filePath = targetUri.fsPath;
-
-    // Obsidian expects forward slashes even on Windows.
-    if (process.platform === 'win32') {
-      filePath = filePath.replace(/\\/g, '/');
-    }
-
-    const encodedPath = encodeURIComponent(filePath);
-    const obsidianUri = `obsidian://open?path=${encodedPath}`;
-
-    let cmd;
-    switch (process.platform) {
-      case 'darwin':
-        cmd = `open "${obsidianUri}"`;
-        break;
-      case 'win32':
-        cmd = `start "" "${obsidianUri}"`;
-        break;
-      default:
-        cmd = `xdg-open "${obsidianUri}"`;
-    }
-
-    exec(cmd, (err) => {
-      if (err) {
-        vscode.window.showErrorMessage(`Failed to open Obsidian: ${err.message}`);
-      }
-    });
-  });
-
-  context.subscriptions.push(disposable, statusBarItem);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openInObsidian.open', (uri) => {
+      const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+      return openTargetInObsidian(targetUri, true);
+    }),
+    vscode.commands.registerCommand('openInObsidian.openVault', (uri) => {
+      return openTargetInObsidian(uri, false);
+    }),
+    statusBarItem
+  );
 }
 
 function deactivate() {}
