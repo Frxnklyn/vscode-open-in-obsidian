@@ -1,34 +1,61 @@
 # Open in Obsidian (VS Code extension)
 
-Adds a command, an editor/explorer right-click item, a keyboard shortcut
-(`Cmd/Ctrl+Alt+O` on a `.md` file), and a status bar button that opens the
-current file in Obsidian, jumping straight to the right note in the right
-vault. The status bar button appears at the bottom left whenever a Markdown
-file is active.
+Open Markdown files or registered Obsidian vaults directly from the VS Code Explorer.
 
-It works by shelling out to `obsidian://open?path=<absolute file path>`.
-Obsidian's `path` parameter searches your known vaults for whichever one
-contains that path, so you don't need to hardcode a vault name anywhere.
+## Commands
+
+- **Open in Obsidian**: Right-click a `.md` file, use the editor context menu,
+  click the status bar icon for an active Markdown file, or press `Ctrl+Alt+O`
+  (`Cmd+Alt+O` on macOS). The note opens in its registered vault.
+- **Open Vault in Obsidian**: Right-click a local folder in the Explorer.
+  Obsidian opens the most specific registered vault containing that folder.
 
 ![Example](images/example.png)
 
-## Notes / things to check on your machine
+## How vault detection works
 
-- First run: Obsidian needs to already know about the vault the file lives
-  in (i.e. you've opened that vault at least once before). It finds the
-  vault by matching the path, so this should already be true for any note
-  you're actively editing.
-- Windows paths: the extension swaps backslashes for forward slashes before
-  encoding, since Obsidian expects `/`-style paths even on Windows. If path
-  matching still fails on your setup, that's the first thing to double check.
-- Changing the shortcut: edit the `keybindings` block in `package.json`
-  before repackaging, or just rebind `openInObsidian.open` in VS Code's
-  Keyboard Shortcuts UI after installing — no need to repackage for that.
-- Changing where it shows up: the `when` clauses currently restrict it to
-  `.md` files. Adjust `resourceExtname` / `resourceLangId` in `package.json`
-  if you want it available more broadly (e.g. also on `.mdx`).
-- To release a new version: bump `version` in `package.json`, commit, then
-  create a GitHub Release with tag `v<version>` (must match). Publishing
-  the release triggers CI to package and publish to the Marketplace. A
-  plain `git push --tags` does **not** trigger it — only a published
-  Release does.
+The extension reads Obsidian's registered vaults from its application config:
+
+- Windows: `%APPDATA%\obsidian\obsidian.json`
+- macOS: `~/Library/Application Support/obsidian/obsidian.json`
+- Linux: `${XDG_CONFIG_HOME:-~/.config}/obsidian/obsidian.json`
+
+It chooses the most specific matching vault by comparing full directory paths
+(case-insensitively on Windows) and opens it through Obsidian's URI protocol:
+
+```text
+obsidian://open?vault=<encoded-vault-id>
+obsidian://open?vault=<encoded-vault-id>&file=<encoded-relative-path>
+```
+
+All parameters are URL-encoded. Nothing needs to be configured in the extension.
+The extension uses `vscode.env.openExternal()` rather than a shell command.
+
+**A folder must already have been registered as a vault in Obsidian.**
+This extension does not create vaults or `.obsidian` directories. If a selected
+folder belongs to no registered vault, VS Code displays a warning.
+
+Selecting a subfolder opens the containing **vault**, not the subfolder as a
+separate vault. If vaults are nested, the innermost registered vault wins.
+
+The commands require local `file:` resources; remote/virtual files are not
+supported by the current local-path registry matching.
+
+## Development
+
+```sh
+pnpm install
+pnpm test
+pnpm run package
+```
+
+Install the resulting `.vsix` through VS Code's **Extensions → ... →
+Install from VSIX**, then run **Developer: Reload Window** if an older
+installed version is still loaded.
+
+**Fork packaging note:** The manifest still uses the upstream Marketplace
+publisher (`dndd`). To distribute an independently updated fork, first assign
+your own publisher ID and ideally a distinct extension name, so that the
+official extension does not conflict with your version. The existing publish
+workflow is configured for the upstream publisher and should not be run
+unchanged from a fork.
