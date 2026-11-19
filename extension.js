@@ -7,9 +7,13 @@ const {
   buildOpenUri,
 } = require('./vaults');
 
-async function openFileInObsidian(targetUri) {
+async function openTargetInObsidian(targetUri, openFile) {
   if (!targetUri || targetUri.scheme !== 'file') {
-    vscode.window.showErrorMessage('Select a local Markdown file to open in Obsidian.');
+    vscode.window.showErrorMessage(
+      openFile
+        ? 'Select a local Markdown file to open in Obsidian.'
+        : 'Right-click a local folder in the Explorer to open its Obsidian vault.'
+    );
     return;
   }
 
@@ -37,7 +41,7 @@ async function openFileInObsidian(targetUri) {
     return;
   }
 
-  const obsidianUri = buildOpenUri(match.id, match.relativePath);
+  const obsidianUri = buildOpenUri(match.id, openFile ? match.relativePath : undefined);
   try {
     const opened = await vscode.env.openExternal(vscode.Uri.parse(obsidianUri));
     if (!opened) {
@@ -73,7 +77,10 @@ function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('openInObsidian.open', (uri) => {
       const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
-      return openFileInObsidian(targetUri);
+      return openTargetInObsidian(targetUri, true);
+    }),
+    vscode.commands.registerCommand('openInObsidian.openVault', (uri) => {
+      return openTargetInObsidian(uri, false);
     }),
     statusBarItem
   );
