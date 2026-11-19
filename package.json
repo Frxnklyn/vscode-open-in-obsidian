@@ -1,7 +1,7 @@
 {
   "name": "open-in-obsidian",
   "displayName": "Open in Obsidian",
-  "description": "Open the current Markdown file in Obsidian via its URI scheme",
+  "description": "Open Markdown files and registered Obsidian vaults directly from VS Code",
   "version": "0.0.3",
   "packageManager": "pnpm@10.28.0",
   "publisher": "dndd",
@@ -23,7 +23,8 @@
   "main": "./extension.js",
   "scripts": {
     "package": "vsce package --no-dependencies",
-    "publish": "vsce publish --no-dependencies"
+    "publish": "vsce publish --no-dependencies",
+    "test": "node --test"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
@@ -34,6 +35,10 @@
       {
         "command": "openInObsidian.open",
         "title": "Open in Obsidian"
+      },
+      {
+        "command": "openInObsidian.openVault",
+        "title": "Open Vault in Obsidian"
       }
     ],
     "menus": {
@@ -46,8 +51,13 @@
       ],
       "explorer/context": [
         {
-          "when": "resourceExtname == .md",
+          "when": "resourceExtname == .md && !explorerResourceIsFolder && resourceScheme == file",
           "command": "openInObsidian.open",
+          "group": "z_commands"
+        },
+        {
+          "when": "explorerResourceIsFolder && resourceScheme == file",
+          "command": "openInObsidian.openVault",
           "group": "z_commands"
         }
       ]
