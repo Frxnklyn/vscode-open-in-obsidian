@@ -4,3 +4,4 @@
 .github/**
 .vscode/**
 pnpm-lock.yaml
+test/**
