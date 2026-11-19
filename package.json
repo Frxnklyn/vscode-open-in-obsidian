@@ -24,7 +24,7 @@
   "scripts": {
     "package": "vsce package --no-dependencies",
     "publish": "vsce publish --no-dependencies",
-    "test": "node --test"
+    "test": "node --check extension.js && node --test"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
