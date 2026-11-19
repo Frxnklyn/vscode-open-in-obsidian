@@ -23,7 +23,8 @@
   "main": "./extension.js",
   "scripts": {
     "package": "vsce package --no-dependencies",
-    "publish": "vsce publish --no-dependencies"
+    "publish": "vsce publish --no-dependencies",
+    "test": "node --test"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
@@ -46,7 +47,7 @@
       ],
       "explorer/context": [
         {
-          "when": "resourceExtname == .md",
+          "when": "resourceExtname == .md && !explorerResourceIsFolder && resourceScheme == file",
           "command": "openInObsidian.open",
           "group": "z_commands"
         }
